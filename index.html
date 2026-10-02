@@ -1010,6 +1010,177 @@ async function adminPlans(){
 $("cartLink").onclick=e=>{e.preventDefault();showCart()};
 
 /* =========================================================
+   MASTER CATALOG SEED DATA — 97 products, Maldivian market prices (MVR)
+   Images fetched automatically from Open Food Facts on seed
+   ========================================================= */
+const SEED_CATALOG=[
+  // 🌾 Staples & Grains
+  {name:"White Jasmine Rice",brand:"Kaalar",unit:"5kg",category:"Staples & Grains",suggestedPrice:85},
+  {name:"White Rice",brand:"",unit:"1kg",category:"Staples & Grains",suggestedPrice:18},
+  {name:"Basmati Rice",brand:"",unit:"5kg",category:"Staples & Grains",suggestedPrice:170},
+  {name:"All Purpose Flour",brand:"",unit:"1kg",category:"Staples & Grains",suggestedPrice:12},
+  {name:"Self Raising Flour",brand:"",unit:"1kg",category:"Staples & Grains",suggestedPrice:15},
+  {name:"Spaghetti",brand:"",unit:"500g",category:"Staples & Grains",suggestedPrice:20},
+  {name:"Macaroni",brand:"",unit:"500g",category:"Staples & Grains",suggestedPrice:18},
+  {name:"Instant Noodles",brand:"Mamee",unit:"per pack",category:"Staples & Grains",suggestedPrice:5},
+  {name:"White Bread Loaf",brand:"",unit:"500g",category:"Staples & Grains",suggestedPrice:23},
+  {name:"Rolled Oats",brand:"",unit:"500g",category:"Staples & Grains",suggestedPrice:35},
+  {name:"White Sugar",brand:"",unit:"1kg",category:"Staples & Grains",suggestedPrice:14},
+  {name:"Salt",brand:"Finnesse",unit:"500g",category:"Staples & Grains",suggestedPrice:5},
+  // 🥛 Dairy & Eggs
+  {name:"UHT Full Cream Milk",brand:"Almarai",unit:"1L",category:"Dairy & Eggs",suggestedPrice:32},
+  {name:"Full Cream Milk",brand:"Dutch Lady",unit:"1L",category:"Dairy & Eggs",suggestedPrice:44},
+  {name:"Full Cream Milk Powder",brand:"Almudhish",unit:"900g",category:"Dairy & Eggs",suggestedPrice:142},
+  {name:"Full Cream Milk Powder",brand:"Coast",unit:"400g",category:"Dairy & Eggs",suggestedPrice:92},
+  {name:"Condensed Milk",brand:"",unit:"390g",category:"Dairy & Eggs",suggestedPrice:22},
+  {name:"Butter",brand:"",unit:"200g",category:"Dairy & Eggs",suggestedPrice:35},
+  {name:"Cheese Slices",brand:"",unit:"200g",category:"Dairy & Eggs",suggestedPrice:45},
+  {name:"Eggs",brand:"",unit:"12 pcs",category:"Dairy & Eggs",suggestedPrice:28},
+  {name:"Fresh Yoghurt",brand:"",unit:"125g",category:"Dairy & Eggs",suggestedPrice:18},
+  {name:"Whipping Cream",brand:"",unit:"200ml",category:"Dairy & Eggs",suggestedPrice:28},
+  // 🐟 Canned & Tinned
+  {name:"Felivaru Tuna Chunks in Brine",brand:"Fasmeeru",unit:"180g",category:"Canned & Tinned",suggestedPrice:17},
+  {name:"Felivaru Tuna Chunks in Oil",brand:"Fasmeeru",unit:"180g",category:"Canned & Tinned",suggestedPrice:18},
+  {name:"Felivaru Tuna in Black Pepper",brand:"Fasmeeru",unit:"180g",category:"Canned & Tinned",suggestedPrice:20},
+  {name:"Felivaru Tuna Steak in Olive Oil",brand:"Fasmeeru",unit:"180g",category:"Canned & Tinned",suggestedPrice:24},
+  {name:"Felivaru Tuna Steak in Spring Water",brand:"Fasmeeru",unit:"200g",category:"Canned & Tinned",suggestedPrice:19},
+  {name:"Baked Beans",brand:"",unit:"400g",category:"Canned & Tinned",suggestedPrice:22},
+  {name:"Coconut Milk",brand:"",unit:"400ml",category:"Canned & Tinned",suggestedPrice:22},
+  {name:"Tomato Paste",brand:"Almudhish",unit:"70g",category:"Canned & Tinned",suggestedPrice:4},
+  {name:"Sardines in Oil",brand:"",unit:"200g",category:"Canned & Tinned",suggestedPrice:15},
+  {name:"Chickpeas",brand:"",unit:"400g",category:"Canned & Tinned",suggestedPrice:20},
+  {name:"Lentils",brand:"",unit:"500g",category:"Canned & Tinned",suggestedPrice:18},
+  {name:"Kidney Beans",brand:"",unit:"400g",category:"Canned & Tinned",suggestedPrice:20},
+  {name:"Sweet Corn",brand:"",unit:"340g",category:"Canned & Tinned",suggestedPrice:18},
+  // 🛢️ Cooking Oils & Condiments
+  {name:"Sunflower Cooking Oil",brand:"",unit:"1L",category:"Cooking Oils & Condiments",suggestedPrice:35},
+  {name:"Sunflower Cooking Oil",brand:"",unit:"5L",category:"Cooking Oils & Condiments",suggestedPrice:155},
+  {name:"Olive Oil",brand:"",unit:"500ml",category:"Cooking Oils & Condiments",suggestedPrice:60},
+  {name:"Coconut Oil",brand:"",unit:"500ml",category:"Cooking Oils & Condiments",suggestedPrice:45},
+  {name:"Dark Soy Sauce",brand:"Elephant",unit:"640ml",category:"Cooking Oils & Condiments",suggestedPrice:44},
+  {name:"Light Soy Sauce",brand:"Elephant",unit:"640ml",category:"Cooking Oils & Condiments",suggestedPrice:47},
+  {name:"Tomato Ketchup",brand:"",unit:"320g",category:"Cooking Oils & Condiments",suggestedPrice:22},
+  {name:"Mayonnaise",brand:"Alfa",unit:"236ml",category:"Cooking Oils & Condiments",suggestedPrice:22},
+  {name:"Fish Sauce",brand:"",unit:"200ml",category:"Cooking Oils & Condiments",suggestedPrice:18},
+  {name:"Oyster Sauce",brand:"Edinborough",unit:"300g",category:"Cooking Oils & Condiments",suggestedPrice:25},
+  {name:"White Vinegar",brand:"",unit:"473ml",category:"Cooking Oils & Condiments",suggestedPrice:15},
+  {name:"Chilli Sauce",brand:"",unit:"250ml",category:"Cooking Oils & Condiments",suggestedPrice:20},
+  // 🌶️ Spices & Seasoning
+  {name:"Black Pepper Powder",brand:"",unit:"50g",category:"Spices & Seasoning",suggestedPrice:15},
+  {name:"Cumin Powder",brand:"Eastern",unit:"100g",category:"Spices & Seasoning",suggestedPrice:22},
+  {name:"Turmeric Powder",brand:"",unit:"100g",category:"Spices & Seasoning",suggestedPrice:18},
+  {name:"Chilli Powder",brand:"",unit:"100g",category:"Spices & Seasoning",suggestedPrice:18},
+  {name:"Coriander Powder",brand:"",unit:"100g",category:"Spices & Seasoning",suggestedPrice:18},
+  {name:"Fish Masala Powder",brand:"Eastern",unit:"100g",category:"Spices & Seasoning",suggestedPrice:20},
+  {name:"Garam Masala",brand:"",unit:"50g",category:"Spices & Seasoning",suggestedPrice:20},
+  {name:"Cinnamon Sticks",brand:"",unit:"50g",category:"Spices & Seasoning",suggestedPrice:15},
+  {name:"Cardamom Pods",brand:"",unit:"25g",category:"Spices & Seasoning",suggestedPrice:30},
+  {name:"MSG Seasoning",brand:"Aji-No-Moto",unit:"50g",category:"Spices & Seasoning",suggestedPrice:8},
+  {name:"Vanilla Essence",brand:"Battle-Ship",unit:"25ml",category:"Spices & Seasoning",suggestedPrice:27},
+  // 🥦 Fresh Produce
+  {name:"Onions",brand:"",unit:"1kg",category:"Fresh Produce",suggestedPrice:18},
+  {name:"Tomatoes",brand:"",unit:"1kg",category:"Fresh Produce",suggestedPrice:35},
+  {name:"Potatoes",brand:"",unit:"1kg",category:"Fresh Produce",suggestedPrice:22},
+  {name:"Cabbage",brand:"",unit:"per head",category:"Fresh Produce",suggestedPrice:25},
+  {name:"Cucumber",brand:"",unit:"1kg",category:"Fresh Produce",suggestedPrice:28},
+  {name:"Carrot",brand:"",unit:"1kg",category:"Fresh Produce",suggestedPrice:25},
+  {name:"Pumpkin",brand:"",unit:"1kg",category:"Fresh Produce",suggestedPrice:20},
+  {name:"Green Chilli",brand:"",unit:"200g",category:"Fresh Produce",suggestedPrice:15},
+  {name:"Garlic",brand:"",unit:"250g",category:"Fresh Produce",suggestedPrice:25},
+  {name:"Ginger",brand:"",unit:"200g",category:"Fresh Produce",suggestedPrice:18},
+  {name:"Lemon",brand:"",unit:"per piece",category:"Fresh Produce",suggestedPrice:5},
+  {name:"Banana",brand:"",unit:"bunch",category:"Fresh Produce",suggestedPrice:30},
+  {name:"Watermelon",brand:"",unit:"whole",category:"Fresh Produce",suggestedPrice:45},
+  {name:"Mango",brand:"",unit:"1kg",category:"Fresh Produce",suggestedPrice:40},
+  // 🍗 Meat & Frozen
+  {name:"Chicken Fillet",brand:"",unit:"1kg",category:"Meat & Frozen",suggestedPrice:85},
+  {name:"Whole Chicken",brand:"",unit:"1kg",category:"Meat & Frozen",suggestedPrice:65},
+  {name:"Minced Beef",brand:"",unit:"500g",category:"Meat & Frozen",suggestedPrice:65},
+  {name:"Frozen Prawn",brand:"",unit:"500g",category:"Meat & Frozen",suggestedPrice:95},
+  {name:"Fish Steak",brand:"",unit:"500g",category:"Meat & Frozen",suggestedPrice:55},
+  {name:"Fish Fingers",brand:"",unit:"500g",category:"Meat & Frozen",suggestedPrice:45},
+  // 🥤 Beverages
+  {name:"Drinking Water",brand:"",unit:"1.5L",category:"Beverages",suggestedPrice:8},
+  {name:"Milo Chocolate Drink",brand:"Milo",unit:"400g",category:"Beverages",suggestedPrice:65},
+  {name:"Nescafe 3in1",brand:"Nescafe",unit:"per sachet",category:"Beverages",suggestedPrice:5},
+  {name:"Tea Bags",brand:"",unit:"100 pcs",category:"Beverages",suggestedPrice:45},
+  {name:"Orange Juice",brand:"",unit:"1L",category:"Beverages",suggestedPrice:35},
+  {name:"Coconut Water",brand:"",unit:"330ml",category:"Beverages",suggestedPrice:12},
+  {name:"Energy Drink",brand:"",unit:"250ml",category:"Beverages",suggestedPrice:18},
+  // 🍪 Snacks & Biscuits
+  {name:"Cream Crackers",brand:"",unit:"200g",category:"Snacks & Biscuits",suggestedPrice:15},
+  {name:"Chocolate Biscuits",brand:"",unit:"200g",category:"Snacks & Biscuits",suggestedPrice:18},
+  {name:"Potato Chips",brand:"",unit:"60g",category:"Snacks & Biscuits",suggestedPrice:12},
+  {name:"Roasted Peanuts",brand:"",unit:"200g",category:"Snacks & Biscuits",suggestedPrice:15},
+  {name:"Dates",brand:"",unit:"500g",category:"Snacks & Biscuits",suggestedPrice:45},
+  {name:"Wafer Biscuits",brand:"ETI",unit:"150g",category:"Snacks & Biscuits",suggestedPrice:18},
+  // 🧹 Household
+  {name:"Dishwashing Liquid",brand:"",unit:"500ml",category:"Household",suggestedPrice:18},
+  {name:"Laundry Detergent",brand:"",unit:"1kg",category:"Household",suggestedPrice:35},
+  {name:"Toilet Paper",brand:"",unit:"4 rolls",category:"Household",suggestedPrice:22},
+  {name:"Hand Wash Liquid",brand:"",unit:"250ml",category:"Household",suggestedPrice:20},
+  {name:"Garbage Bags",brand:"",unit:"30 pcs",category:"Household",suggestedPrice:18},
+  {name:"Floor Cleaner",brand:"",unit:"500ml",category:"Household",suggestedPrice:22},
+  {name:"Aluminium Foil",brand:"",unit:"10m roll",category:"Household",suggestedPrice:18},
+];
+
+const SEED_QUERIES={
+  "Staples & Grains":"rice flour bread pasta",
+  "Dairy & Eggs":"milk eggs dairy butter",
+  "Canned & Tinned":"tuna canned fish beans",
+  "Cooking Oils & Condiments":"cooking oil sauce condiment",
+  "Spices & Seasoning":"spice seasoning powder cumin",
+  "Fresh Produce":"vegetables fruit tomato onion",
+  "Meat & Frozen":"chicken meat frozen",
+  "Beverages":"juice drink milk beverage",
+  "Snacks & Biscuits":"biscuit snack chips crackers",
+  "Household":"cleaning detergent household soap"
+};
+
+window.seedCatalog=async()=>{
+  if(!confirm("This will add "+SEED_CATALOG.length+" grocery products to the catalog with Maldivian market prices. Continue?"))return;
+  openModal(`<h2>🌱 Seeding catalog…</h2>
+    <p class="muted">Fetching product images from Open Food Facts — one search per category.</p>
+    <div id="seedMsg" style="margin-top:14px;font-weight:600">Starting…</div>
+    <div style="background:var(--line);border-radius:99px;height:10px;margin-top:8px"><div id="seedBar" style="background:var(--teal);height:10px;border-radius:99px;width:0;transition:.4s"></div></div>
+    <div id="seedDetail" class="muted" style="margin-top:8px"></div>`);
+  const cats=Object.keys(SEED_QUERIES);
+  const catImgs={};
+  for(let i=0;i<cats.length;i++){
+    const cat=cats[i];
+    if(!$("seedMsg"))break;
+    $("seedMsg").textContent="Searching: "+cat+"…";
+    $("seedBar").style.width=((i+1)/(cats.length+1)*80)+"%";
+    try{
+      const n=SEED_CATALOG.filter(p=>p.category===cat).length;
+      const r=await fetch("https://world.openfoodfacts.org/cgi/search.pl?search_terms="+encodeURIComponent(SEED_QUERIES[cat])+"&json=1&page_size="+(n*2+5)+"&fields=image_thumb_url");
+      const d=await r.json();
+      catImgs[cat]=(d.products||[]).filter(p=>p.image_thumb_url).map(p=>p.image_thumb_url);
+    }catch{catImgs[cat]=[]}
+    await new Promise(r=>setTimeout(r,350));
+  }
+  if($("seedMsg"))$("seedMsg").textContent="Writing "+SEED_CATALOG.length+" products to catalog…";
+  if($("seedBar"))$("seedBar").style.width="90%";
+  const catIdx={};
+  const batch=db.batch();
+  SEED_CATALOG.forEach(item=>{
+    if(!catIdx[item.category])catIdx[item.category]=0;
+    const imgs=catImgs[item.category]||[];
+    const imageUrl=imgs[catIdx[item.category]++]||"";
+    batch.set(db.collection("catalog").doc(),{
+      name:item.name,brand:item.brand||"",unit:item.unit||"",
+      category:item.category,suggestedPrice:item.suggestedPrice||0,
+      imageUrl,createdAt:FV.serverTimestamp()
+    });
+  });
+  await batch.commit();
+  if($("seedBar"))$("seedBar").style.width="100%";
+  if($("seedMsg"))$("seedMsg").textContent="✅ Done! "+SEED_CATALOG.length+" products added.";
+  if($("seedDetail"))$("seedDetail").textContent="Businesses can now browse and add these to their stores.";
+  setTimeout(()=>{closeModal();loadCatalog();},2500);
+};
+
+/* =========================================================
    SHARE STORE
    ========================================================= */
 function shareStore(url,name){
@@ -1076,13 +1247,21 @@ window.filterWA=v=>{const s=$("wAddrSug");if(!s)return;s.querySelectorAll("div")
 function adminCatalog(){
   $("adminBody").innerHTML=`
     <div class="row spread" style="margin-bottom:16px">
-      <h3>Product catalog</h3>
+      <h3>Product catalog <span class="muted" id="catCount"></span></h3>
       <div class="row">
-        <button class="btn btn-o btn-sm" onclick="searchOFFModal()">🔍 Import from Open Food Facts</button>
-        <button class="btn btn-p btn-sm" onclick="addCatalogManual()">+ Add manually</button>
+        <button class="btn btn-p btn-sm" style="background:var(--green)" onclick="seedCatalog()">🌱 Seed ${SEED_CATALOG.length} products</button>
+        <button class="btn btn-o btn-sm" onclick="importSupermartModal()">🛒 Import from Supermart</button>
+        <button class="btn btn-o btn-sm" onclick="searchOFFModal()">🔍 Open Food Facts</button>
+        <button class="btn btn-o btn-sm" onclick="addCatalogManual()">+ Add manually</button>
       </div>
     </div>
-    <input id="catQ" placeholder="Filter catalog…" oninput="filterCatalogList(this.value)" style="margin-bottom:12px">
+    <div class="row" style="margin-bottom:12px;gap:8px">
+      <input id="catQ" placeholder="Search catalog…" oninput="filterCatalogList(this.value)" style="flex:1">
+      <select id="catCatFilter" onchange="filterCatalogList($('catQ').value)" style="width:auto">
+        <option value="">All categories</option>
+        ${[...new Set(SEED_CATALOG.map(p=>p.category))].map(c=>`<option>${c}</option>`).join("")}
+      </select>
+    </div>
     <div id="catalogGrid"><div class="empty">Loading catalog…</div></div>`;
   loadCatalog();
 }
@@ -1092,24 +1271,158 @@ async function loadCatalog(){
   renderCatalog(window._catalog);
 }
 function renderCatalog(items){
+  const cc=$("catCount");if(cc)cc.textContent="("+items.length+")";
   $("catalogGrid").innerHTML=items.length?`<div class="cat-grid">${items.map(item=>`
     <div class="cat-card">
       ${item.imageUrl?`<img src="${item.imageUrl}" onerror="this.style.display='none'" alt="">`:
-        `<div style="width:70px;height:70px;background:var(--bg);border-radius:8px;margin:0 auto 8px"></div>`}
+        `<div style="width:70px;height:70px;background:var(--bg);border-radius:8px;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:28px">🛒</div>`}
       <div class="iname">${esc(item.name)}</div>
       ${item.brand?`<div class="muted">${esc(item.brand)}</div>`:""}
       ${item.unit?`<div class="muted">${esc(item.unit)}</div>`:""}
-      <div class="row" style="margin-top:8px;justify-content:center;gap:6px">
+      ${item.suggestedPrice?`<div class="price" style="margin:4px 0;font-size:13px">${mvr(item.suggestedPrice)}</div>`:""}
+      <div class="muted" style="font-size:11px;margin-bottom:6px">${esc(item.category||"")}</div>
+      <div class="row" style="justify-content:center;gap:6px">
         <button class="btn btn-o btn-sm" onclick="editCatalogItem('${item.id}')">Edit</button>
         <button class="btn btn-danger btn-sm" onclick="delCatalogItem('${item.id}')">Del</button>
       </div>
     </div>`).join("")}</div>`:
-  `<div class="empty"><div class="big">📦</div>Catalog is empty. Import from Open Food Facts or add manually.</div>`;
+  `<div class="empty"><div class="big">📦</div>Catalog is empty.<br>Click <strong>🌱 Seed ${SEED_CATALOG.length} products</strong> to populate with Maldivian grocery items and prices.</div>`;
 }
 window.filterCatalogList=q=>{
-  const lower=q.toLowerCase();
-  const filtered=(window._catalog||[]).filter(i=>i.name.toLowerCase().includes(lower)||(i.brand||"").toLowerCase().includes(lower));
+  const lower=(q||"").toLowerCase();
+  const cat=$("catCatFilter")?.value||"";
+  const filtered=(window._catalog||[]).filter(i=>
+    (!lower||i.name.toLowerCase().includes(lower)||(i.brand||"").toLowerCase().includes(lower))&&
+    (!cat||i.category===cat)
+  );
   renderCatalog(filtered);
+};
+
+/* ─── SUPERMART (estore.mv) IMPORT ─── */
+// Known Supermart products with confirmed image URLs, names, prices, categories
+const SUPERMART_KNOWN=[
+  {name:"Parboiled Rice",brand:"STO",unit:"10kg",category:"Staples & Grains",suggestedPrice:199,slug:"parboiled-rice-10002014-2050000018152"},
+  {name:"Happy Cow Cheese Spread",brand:"Happy Cow",unit:"150g",category:"Dairy & Eggs",suggestedPrice:35,slug:"happy-cow-cheese-spread-150g-10067747"},
+  {name:"Happy Cow Slice Cheese Cheddar",brand:"Happy Cow",unit:"200g",category:"Dairy & Eggs",suggestedPrice:48,slug:"happy-cow-slice-cheese-cheddar-200g-10086362"},
+  {name:"Happy Cow Slice Cheese Regular",brand:"Happy Cow",unit:"200g",category:"Dairy & Eggs",suggestedPrice:45,slug:"happy-cow-slice-cheese-regular-200g-10067751"},
+  {name:"Happy Cow Processed Cheese",brand:"Happy Cow",unit:"340g",category:"Dairy & Eggs",suggestedPrice:75,slug:"happy-cow-processed-cheese-340g-------10067749"},
+  {name:"Superchef White Vinegar",brand:"Superchef",unit:"1L",category:"Cooking Oils & Condiments",suggestedPrice:19,slug:"superchef-white-vinegar-1l-10064301"},
+  {name:"Superchef Toor Dhaal Yellow",brand:"Superchef",unit:"500g",category:"Canned & Tinned",suggestedPrice:18,slug:"superchef-toor-dhaal-yellow---500g-10064343"},
+  {name:"Safa Tomato Paste",brand:"Safa",unit:"70g",category:"Cooking Oils & Condiments",suggestedPrice:4,slug:"safa-tomato-paste-70g-000000000010006821"},
+  {name:"Bayara Paprika Powder",brand:"Bayara",unit:"100g",category:"Spices & Seasoning",suggestedPrice:22,slug:"bayara-paprika-powder-100ml-10056461"},
+  {name:"Tunisian Dates",brand:"",unit:"500g",category:"Snacks & Biscuits",suggestedPrice:45,slug:"tunisian-dates-500g-10007178"},
+];
+const CORS_PROXY="https://api.allorigins.win/get?url=";
+async function fetchSupermartProduct(slug){
+  try{
+    const r=await fetch(CORS_PROXY+encodeURIComponent("https://estore.mv/Product/Index/"+slug));
+    const d=await r.json();
+    const html=d.contents||"";
+    // Extract name from <title>
+    const nameM=html.match(/<title>([^<]+)<\/title>/i);
+    const name=nameM?nameM[1].trim():"";
+    // Extract price
+    const priceM=html.match(/MVR\s*([\d.]+)/);
+    const price=priceM?parseFloat(priceM[1]):0;
+    // Extract image (Uploads/Products path, not Thumbnails)
+    const imgM=html.match(/https:\/\/estore\.mv\/Uploads\/Products\/(?!Thumbnails)[^"'\s]+\.jpg/);
+    const imageUrl=imgM?imgM[0]:"";
+    // Extract category
+    const catM=html.match(/In stock[\s\S]{0,60}?\d{6,}\s*\n\s*([^\n<]+)/);
+    const category=catM?catM[1].trim():"";
+    return{name,price,imageUrl,category,slug};
+  }catch{return null}
+}
+window.importSupermartModal=()=>{
+  openModal(`<h2>🛒 Import from STO Supermart</h2>
+    <p class="muted">Paste estore.mv product URL(s) — one per line — or use the quick-add list below.</p>
+    <textarea id="smUrls" rows="4" placeholder="https://estore.mv/Product/Index/product-name-10012345&#10;https://estore.mv/Product/Index/another-product-10067890" style="font-size:12px;font-family:monospace"></textarea>
+    <button class="btn btn-p btn-sm" style="margin-top:8px" onclick="scrapeSupermartUrls()">🔍 Fetch & preview</button>
+    <hr style="border:none;border-top:1px solid var(--line);margin:14px 0">
+    <p style="font-weight:600;margin-bottom:8px">Quick-add known Supermart products (${SUPERMART_KNOWN.length} items)</p>
+    <div style="max-height:240px;overflow:auto" class="cat-grid">${SUPERMART_KNOWN.map((p,i)=>`
+      <div class="cat-card selectable" id="smk_${i}" onclick="toggleSMSel(${i})">
+        <div class="sel-check">✓</div>
+        <div class="iname">${esc(p.name)}</div>
+        <div class="muted">${esc(p.brand)} · ${esc(p.unit)}</div>
+        <div class="price" style="font-size:12px;margin-top:4px">${mvr(p.suggestedPrice)}</div>
+      </div>`).join("")}</div>
+    <button class="btn btn-p" style="width:100%;margin-top:12px" id="smAddKnownBtn">Add selected (0) — images fetched from Supermart</button>
+    <div id="smScrapeOut" style="margin-top:12px"></div>`);
+  window._smSel=new Set();
+  $("smAddKnownBtn").onclick=addKnownSupermart;
+};
+window.toggleSMSel=i=>{
+  const card=$("smk_"+i);if(!card)return;
+  if(window._smSel.has(i)){window._smSel.delete(i);card.classList.remove("selected")}
+  else{window._smSel.add(i);card.classList.add("selected")}
+  $("smAddKnownBtn").textContent=window._smSel.size?"Add selected ("+window._smSel.size+") — images fetched from Supermart":"Add selected (0) — images fetched from Supermart";
+};
+window.addKnownSupermart=async()=>{
+  if(!window._smSel.size){toast("Select at least one product");return}
+  $("smAddKnownBtn").disabled=true;
+  const sel=[...window._smSel].map(i=>SUPERMART_KNOWN[i]);
+  $("smScrapeOut").innerHTML=`<div class="muted">Fetching ${sel.length} products from Supermart…</div>`;
+  const results=[];
+  for(const p of sel){
+    $("smScrapeOut").innerHTML=`<div class="muted">Fetching: ${esc(p.name)}…</div>`;
+    const fetched=await fetchSupermartProduct(p.slug);
+    results.push({
+      name:fetched?.name||p.name,
+      brand:p.brand,unit:p.unit,
+      category:p.category,
+      suggestedPrice:fetched?.price||p.suggestedPrice,
+      imageUrl:fetched?.imageUrl||""
+    });
+    await new Promise(r=>setTimeout(r,400));
+  }
+  const batch=db.batch();
+  results.forEach(item=>batch.set(db.collection("catalog").doc(),{...item,createdAt:FV.serverTimestamp()}));
+  await batch.commit();
+  closeModal();
+  toast(results.length+" Supermart products added to catalog!");
+  loadCatalog();
+};
+window.scrapeSupermartUrls=async()=>{
+  const raw=$("smUrls").value.trim();if(!raw)return;
+  const urls=raw.split("\n").map(u=>u.trim()).filter(u=>u.includes("estore.mv/Product/Index/"));
+  if(!urls.length){toast("No valid estore.mv URLs found");return}
+  $("smScrapeOut").innerHTML=`<div class="muted">Fetching ${urls.length} product(s)…</div>`;
+  const results=[];
+  for(const url of urls){
+    const slug=url.split("/Product/Index/")[1]||"";
+    const p=await fetchSupermartProduct(slug);
+    if(p&&p.name)results.push(p);
+    await new Promise(r=>setTimeout(r,400));
+  }
+  if(!results.length){$("smScrapeOut").innerHTML=`<p style="color:var(--red)">Could not fetch products. Check the URLs and try again.</p>`;return}
+  $("smScrapeOut").innerHTML=`
+    <p style="font-weight:600;margin-bottom:8px">Found ${results.length} product(s):</p>
+    <div class="cat-grid">${results.map((p,i)=>`
+      <div class="cat-card selectable selected" id="smr_${i}" onclick="this.classList.toggle('selected')">
+        <div class="sel-check">✓</div>
+        ${p.imageUrl?`<img src="${p.imageUrl}" onerror="this.style.display='none'" style="width:70px;height:70px;object-fit:contain;margin:0 auto 8px;display:block">`:""}
+        <div class="iname">${esc(p.name)}</div>
+        <div class="price" style="font-size:12px;margin-top:4px">${p.price?mvr(p.price):""}</div>
+        <label style="font-size:11px;margin-top:6px">Category</label>
+        <input value="${esc(p.category||"")}" id="smc_${i}" style="font-size:11px;padding:4px 6px">
+      </div>`).join("")}</div>
+    <button class="btn btn-p" style="width:100%;margin-top:12px" onclick="confirmScrapedSupermart()">Add selected to catalog</button>`;
+  window._smScraped=results;
+};
+window.confirmScrapedSupermart=async()=>{
+  const batch=db.batch();
+  (window._smScraped||[]).forEach((p,i)=>{
+    const card=$("smr_"+i);if(!card?.classList.contains("selected"))return;
+    batch.set(db.collection("catalog").doc(),{
+      name:p.name,brand:"",unit:"",
+      category:$("smc_"+i)?.value.trim()||p.category||"Grocery",
+      suggestedPrice:p.price||0,imageUrl:p.imageUrl||"",
+      createdAt:FV.serverTimestamp()
+    });
+  });
+  await batch.commit();
+  closeModal();toast("Products added to catalog!");loadCatalog();
 };
 
 /* Open Food Facts search & import */
@@ -1206,10 +1519,11 @@ window.bizAddFromCatalog=async()=>{
         <div class="cat-card selectable" id="ci_${item.id}" onclick="toggleCatSel('${item.id}')">
           <div class="sel-check">✓</div>
           ${item.imageUrl?`<img src="${item.imageUrl}" onerror="this.style.display='none'" alt="">`:
-            `<div style="width:70px;height:70px;background:var(--bg);border-radius:8px;margin:0 auto 8px"></div>`}
+            `<div style="width:70px;height:70px;background:var(--bg);border-radius:8px;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:26px">🛒</div>`}
           <div class="iname">${esc(item.name)}</div>
           ${item.brand?`<div class="muted">${esc(item.brand)}</div>`:""}
           ${item.unit?`<div class="muted">${esc(item.unit)}</div>`:""}
+          ${item.suggestedPrice?`<div class="price" style="font-size:12px;margin-top:4px">${mvr(item.suggestedPrice)}</div>`:""}
         </div>`).join("")}
       </div>
     </div>
@@ -1221,11 +1535,11 @@ window.bizAddFromCatalog=async()=>{
     const batch=db.batch();
     window._catSel.forEach(id=>{
       const item=window._catItems.find(i=>i.id===id);
-      if(item)batch.set(col.doc(),{name:item.name,desc:(item.brand?item.brand+" ":"")+( item.unit||""),price:0,available:false,sortOrder:99,imageUrl:item.imageUrl||"",imageData:"",catalogId:item.id,createdAt:FV.serverTimestamp()});
+      if(item)batch.set(col.doc(),{name:item.name,desc:(item.brand?item.brand+" ":"")+( item.unit||""),price:item.suggestedPrice||0,available:!!(item.suggestedPrice>0),sortOrder:99,imageUrl:item.imageUrl||"",imageData:"",catalogId:item.id,createdAt:FV.serverTimestamp()});
     });
     await batch.commit();
     closeModal();
-    toast(window._catSel.size+" items added — set prices to make them visible to customers");
+    toast(window._catSel.size+" items added with suggested prices — review and adjust in Products");
     bizProds();
   };
 };
