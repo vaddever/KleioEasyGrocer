@@ -154,6 +154,7 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 /* ===== CONFIG — paste your Firebase project details here ===== */
 const firebaseConfig={
@@ -697,7 +698,7 @@ function bizProds(){
       <h3>Products</h3>
       <div class="row">
         <button class="btn btn-o btn-sm" onclick="bizAddFromCatalog()">📋 From catalog</button>
-        <button class="btn btn-o btn-sm" onclick="bulkCSV()">📂 Bulk CSV</button>
+        <button class="btn btn-o btn-sm" onclick="bulkUpload()">📊 Bulk upload</button>
         <button class="btn btn-p btn-sm" onclick="prodForm()">+ Add product</button>
       </div>
     </div>
@@ -750,31 +751,181 @@ window.prevProdImg=async inp=>{
 };
 window.toggleProd=(id,v)=>db.collection("businesses").doc(myBiz.id).collection("products").doc(id).update({available:v});
 window.delProd=async id=>{if(confirm("Delete this product?"))await db.collection("businesses").doc(myBiz.id).collection("products").doc(id).delete()};
-window.bulkCSV=()=>{
-  openModal(`<h2>Bulk upload products</h2>
-    <p class="muted">CSV format: <strong>name, description, price</strong> (one product per row)</p>
-    <div style="background:var(--bg);border-radius:8px;padding:10px;font-family:monospace;font-size:12px;margin:10px 0;color:var(--ink-soft)">name,description,price<br>Chicken Rice,With sauce and salad,45<br>Fish Soup,Fresh daily catch,35.50</div>
-    <a href="data:text/csv,name%2Cdescription%2Cprice%0AProduct%20Name%2CDescription%20here%2C0.00" download="products_template.csv" class="btn btn-o btn-sm" style="margin-bottom:12px;display:inline-flex">⬇ Download template</a>
-    <label>Choose CSV file</label><input type="file" id="csvFile" accept=".csv,text/csv">
-    <div id="csvPrev" style="margin-top:10px"></div>
-    <button class="btn btn-p" style="width:100%;margin-top:12px" id="csvImportBtn">Import products</button>`);
-  let parsed=[];
-  $("csvFile").onchange=e=>{
-    const f=e.target.files[0];if(!f)return;
-    const r=new FileReader();r.onload=ev=>{
-      const lines=ev.target.result.split(/\r?\n/).filter(l=>l.trim());
-      parsed=lines.slice(1).map(l=>{const c=l.split(",");return{name:(c[0]||"").trim(),desc:(c[1]||"").trim(),price:parseFloat(c[2])||0}}).filter(p=>p.name);
-      $("csvPrev").innerHTML=parsed.length?`<p class="muted" style="margin-bottom:6px">Found <strong>${parsed.length}</strong> products:</p><div style="max-height:150px;overflow:auto;background:var(--bg);border-radius:8px;padding:8px">${parsed.map(p=>`<div class="muted" style="padding:3px 0">${esc(p.name)} — ${mvr(p.price)}</div>`).join("")}</div>`:`<p style="color:var(--red)">No valid products found. Check the CSV format.</p>`;
-    };r.readAsText(f);
+/* ─── BULK UPLOAD (CSV + Excel) ─── */
+function detectBulkCols(headers){
+  const h=headers.map(x=>(x||"").toString().toLowerCase().trim());
+  const find=(...keys)=>{const i=h.findIndex(c=>keys.includes(c));return i};
+  return{
+    name:find("name","product","product name","item","item name","product_name"),
+    desc:find("desc","description","details","notes","info"),
+    price:find("price","cost","mvr","amount","rate","unit price"),
+    unit:find("unit","size","weight","pack","quantity","unit size"),
+    sortOrder:find("order","sort","sort order","display order","sortorder","position","sort_order"),
+    available:find("available","active","enabled","status","visible","in stock"),
   };
-  $("csvImportBtn").onclick=async()=>{
-    if(!parsed.length){toast("No products to import");return}
-    $("csvImportBtn").disabled=true;$("csvImportBtn").textContent="Importing…";
-    const col=db.collection("businesses").doc(myBiz.id).collection("products");
+}
+window.bulkUpload=()=>{
+  window._blkProds=[];
+  openModal(`<h2>📊 Bulk upload products</h2>
+    <p class="muted">Upload an <strong>Excel (.xlsx)</strong> or <strong>CSV</strong> file. First row must be column headers.</p>
+    <div style="background:var(--bg);border-radius:8px;padding:12px;margin:12px 0;font-size:13px">
+      <div style="font-weight:600;margin-bottom:6px">Supported column headers:</div>
+      <div class="row" style="gap:6px;flex-wrap:wrap">
+        <span class="badge b-active">name ✱</span>
+        <span class="badge b-accepted">description</span>
+        <span class="badge b-accepted">price</span>
+        <span class="badge b-accepted">unit</span>
+        <span class="badge b-accepted">sortOrder</span>
+        <span class="badge b-accepted">available</span>
+      </div>
+      <div class="muted" style="margin-top:6px;font-size:12px">✱ required · available: yes/no · sortOrder: 1,2,3… (lower = first)</div>
+    </div>
+    <div class="row" style="gap:8px;margin-bottom:14px">
+      <button class="btn btn-p btn-sm" onclick="dlXLSTemplate()">⬇ Excel template</button>
+      <button class="btn btn-o btn-sm" onclick="dlCSVTemplate()">⬇ CSV template</button>
+    </div>
+    <label>Choose file</label>
+    <input type="file" id="blkFile" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onchange="parseBulkFile(this)">
+    <div id="blkPrev" style="margin-top:14px"></div>
+    <button class="btn btn-p" style="width:100%;margin-top:12px;display:none" id="blkBtn" onclick="doBulkImport()">Import products</button>`);
+};
+
+window.parseBulkFile=async inp=>{
+  const file=inp.files[0];if(!file)return;
+  $("blkPrev").innerHTML=`<div class="muted">Reading file…</div>`;
+  const ext=file.name.split(".").pop().toLowerCase();
+  let rows=[];
+  try{
+    if(ext==="csv"){
+      const text=await file.text();
+      rows=text.split(/\r?\n/).filter(l=>l.trim()).map(l=>{
+        const res=[],len=l.length;let cur="",inQ=false;
+        for(let i=0;i<len;i++){
+          const c=l[i];
+          if(c==='"'){inQ=!inQ}
+          else if(c===","&&!inQ){res.push(cur.trim());cur=""}
+          else cur+=c;
+        }
+        res.push(cur.trim());return res;
+      });
+    }else if(["xlsx","xls"].includes(ext)){
+      if(typeof XLSX==="undefined"){toast("Excel library not loaded yet — try again in a moment");return}
+      const buf=await file.arrayBuffer();
+      const wb=XLSX.read(buf,{type:"array"});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
+    }else{toast("Unsupported format. Please use .xlsx, .xls or .csv");return}
+  }catch(e){$("blkPrev").innerHTML=`<p style="color:var(--red)">Could not read file. Is it a valid Excel or CSV?</p>`;return}
+
+  if(!rows.length||rows.length<2){$("blkPrev").innerHTML=`<p style="color:var(--red)">File is empty or has only one row (headers only).</p>`;return}
+
+  const headers=rows[0].map(h=>(h||"").toString());
+  const dataRows=rows.slice(1).filter(r=>r.some(c=>c!==null&&c!==""&&c!==undefined));
+  const cols=detectBulkCols(headers);
+
+  if(cols.name<0){
+    $("blkPrev").innerHTML=`<div style="color:var(--red);padding:12px;background:var(--red-soft);border-radius:8px">
+      <strong>No "name" column found.</strong><br><span class="muted">Headers in your file: ${esc(headers.join(", "))}</span><br>
+      <span class="muted">Rename your product name column to <strong>name</strong> and try again.</span></div>`;
+    return;
+  }
+
+  window._blkProds=dataRows.map(row=>{
+    const avRaw=(cols.available>=0?(row[cols.available]||"").toString().toLowerCase():"yes");
+    const available=!["no","false","0","hidden","inactive"].includes(avRaw);
+    return{
+      name:(row[cols.name]||"").toString().trim(),
+      desc:cols.desc>=0?(row[cols.desc]||"").toString().trim():"",
+      price:cols.price>=0?Math.round((parseFloat((row[cols.price]||"").toString().replace(/[^\d.]/g,""))||0)*100)/100:0,
+      unit:cols.unit>=0?(row[cols.unit]||"").toString().trim():"",
+      sortOrder:cols.sortOrder>=0?parseInt((row[cols.sortOrder]||"").toString())||99:99,
+      available,
+    };
+  }).filter(p=>p.name);
+
+  const prods=window._blkProds;
+  if(!prods.length){$("blkPrev").innerHTML=`<p style="color:var(--red)">No valid products found (name column appears empty).</p>`;return}
+
+  const skipped=dataRows.length-prods.length;
+  const noPrice=prods.filter(p=>!p.price).length;
+  $("blkPrev").innerHTML=`
+    <div class="row spread" style="margin-bottom:10px;flex-wrap:wrap;gap:6px">
+      <span class="badge b-active" style="font-size:13px">✅ ${prods.length} products ready</span>
+      ${skipped?`<span class="badge b-cancelled">${skipped} rows skipped (no name)</span>`:""}
+      ${noPrice?`<span class="badge b-pending">⚠️ ${noPrice} items with MVR 0 — set prices after import</span>`:""}
+    </div>
+    <div style="overflow:auto;border-radius:10px;border:1px solid var(--line);margin-bottom:4px">
+      <table style="min-width:480px">
+        <thead><tr><th>#</th><th>Name</th><th>Price</th><th>Unit</th><th>Order</th><th>Available</th></tr></thead>
+        <tbody>${prods.slice(0,12).map((p,i)=>`<tr>
+          <td class="muted">${i+1}</td>
+          <td><strong>${esc(p.name)}</strong>${p.desc?`<div class="muted" style="font-size:12px">${esc(p.desc.substring(0,60))}${p.desc.length>60?"…":""}</div>`:""}</td>
+          <td class="price">${p.price?mvr(p.price):`<span class="muted">—</span>`}</td>
+          <td class="muted">${esc(p.unit)||"—"}</td>
+          <td class="muted">${p.sortOrder<99?p.sortOrder:"—"}</td>
+          <td><span class="badge ${p.available?"b-active":"b-suspended"}">${p.available?"Yes":"Hidden"}</span></td>
+        </tr>`).join("")}
+        ${prods.length>12?`<tr><td colspan="6" class="muted" style="text-align:center;padding:10px">… and ${prods.length-12} more products</td></tr>`:""}</tbody>
+      </table>
+    </div>`;
+
+  const btn=$("blkBtn");
+  if(btn){btn.style.display="block";btn.textContent=`Import all ${prods.length} products`}
+};
+
+window.doBulkImport=async()=>{
+  const prods=window._blkProds||[];
+  if(!prods.length){toast("Nothing to import");return}
+  const btn=$("blkBtn");if(btn){btn.disabled=true;btn.textContent="Importing…"}
+  const col=db.collection("businesses").doc(myBiz.id).collection("products");
+  // Firestore batch limit is 500 writes — chunk if needed
+  const CHUNK=400;
+  for(let i=0;i<prods.length;i+=CHUNK){
     const batch=db.batch();
-    parsed.forEach(p=>batch.set(col.doc(),{name:p.name,desc:p.desc,price:p.price,available:true,imageData:"",createdAt:FV.serverTimestamp()}));
-    await batch.commit();closeModal();toast(`${parsed.length} products imported!`);
-  };
+    prods.slice(i,i+CHUNK).forEach(p=>batch.set(col.doc(),{
+      name:p.name,desc:p.desc,price:p.price,unit:p.unit,
+      available:p.available&&p.price>0,
+      sortOrder:p.sortOrder,
+      imageData:"",imageUrl:"",catalogId:"",
+      createdAt:FV.serverTimestamp()
+    }));
+    await batch.commit();
+    if(btn)btn.textContent=`Importing… ${Math.min(i+CHUNK,prods.length)}/${prods.length}`;
+  }
+  closeModal();
+  toast(`✅ ${prods.length} products imported!`);
+};
+
+/* Template downloads */
+window.dlXLSTemplate=()=>{
+  if(typeof XLSX==="undefined"){toast("Excel library loading — try again in a moment");return}
+  const data=[
+    ["name","description","price","unit","sortOrder","available"],
+    ["Jasmine Rice","Premium Thai jasmine rice",85,"5kg",1,"yes"],
+    ["Sunflower Oil","Refined sunflower cooking oil",35,"1L",2,"yes"],
+    ["Tuna Chunks in Brine","Felivaru / Fasmeeru brand",17,"180g",3,"yes"],
+    ["Mineral Water","",8,"1.5L",4,"yes"],
+    ["Eggs","Fresh eggs",28,"12 pcs",5,"yes"],
+    ["White Bread","Fresh baked white loaf",23,"500g",6,"yes"],
+    ["","","","","",""],
+    ["-- Column guide --","","","","",""],
+    ["name","Product name (required)","","","",""],
+    ["description","Short description shown under name","","","",""],
+    ["price","Price in MVR (numbers only)","","","",""],
+    ["unit","Pack size e.g. 1kg, 500ml, 6 pcs","","","",""],
+    ["sortOrder","Display order: 1 appears first","","","",""],
+    ["available","yes = shown to customers · no = hidden","","","",""],
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  ws["!cols"]=[{wch:28},{wch:35},{wch:10},{wch:12},{wch:12},{wch:12}];
+  // Style header row (green fill) — basic styling
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"Products");
+  XLSX.writeFile(wb,"kleio_products_template.xlsx");
+};
+window.dlCSVTemplate=()=>{
+  const csv="name,description,price,unit,sortOrder,available\nJasmine Rice,Premium Thai jasmine rice,85,5kg,1,yes\nSunflower Oil,Refined cooking oil,35,1L,2,yes\nTuna Chunks in Brine,Felivaru brand,17,180g,3,yes";
+  const a=document.createElement("a");a.href="data:text/csv,"+encodeURIComponent(csv);a.download="kleio_products_template.csv";a.click();
 };
 
 /* ─── BIZ SETTINGS ─── */
