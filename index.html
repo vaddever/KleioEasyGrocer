@@ -465,17 +465,21 @@ function trackLive(code){
         <div><strong style="font-size:16px">${esc(o.code)}</strong><div class="muted">${esc(o.bizName)} · ${fmtDate(o.createdAt)}</div></div>
         <div style="text-align:right">${statusBadges(o)}</div>
       </div>
-      ${o.status==="cancelled"?`<div style="margin-top:12px;padding:12px;background:var(--red-soft);border-radius:10px;color:var(--red)">
-        Order cancelled.
-        ${o.paymentStatus==="refund_requested"?"<br>Refund requested and is being processed.":""}
-        ${o.paymentStatus==="refunded"?`<span style="color:var(--green)"><br>✅ Refund has been issued by the store.</span>`:""}
+      ${o.status==="cancelled"?`<div style="margin-top:12px;padding:14px;background:var(--red-soft);border-radius:10px;color:var(--red)">
+        <strong>❌ Order cancelled</strong>
+        ${o.cancelReason?`<br><span style="color:var(--ink-soft)">Reason: ${esc(o.cancelReason)}</span>`:""}
+        ${o.paymentStatus==="refund_requested"?`<br><span style="color:var(--purple)">Refund requested — being processed by the store.</span>`:""}
+        ${o.paymentStatus==="refunded"?`<br><span style="color:var(--green)">✅ Refund has been issued.</span>`:""}
       </div>`:
       `<div class="tl" style="margin-top:18px">${FLOW.map((s,i)=>`
         <div class="tl-step ${i<=idx?"done":""}"><div class="dot"></div>
           <div><strong>${SL[s]}</strong><div class="muted">${i<=idx?"Done":"Waiting"}</div></div>
         </div>`).join("")}</div>`}
-      ${canPay?`<div style="border-top:1px solid var(--line);padding-top:14px"><p style="font-weight:600;margin-bottom:10px">💳 Your order is accepted — please pay to proceed</p><div id="payZone"></div></div>`:""}
-      ${slipPending?`<div style="border-top:1px solid var(--line);padding-top:12px;margin-top:4px"><p class="muted">⏳ Transfer slip submitted — waiting for store to confirm payment.</p></div>`:""}
+      ${canPay?`<div style="border-top:1px solid var(--line);padding-top:14px">
+        <p style="font-weight:700;margin-bottom:12px">💳 Order accepted — complete payment to proceed</p>
+        <div id="payZone"></div></div>`:""}
+      ${slipPending?`<div style="border-top:1px solid var(--line);padding-top:12px;margin-top:4px">
+        <p class="muted">⏳ Transfer slip submitted — waiting for store to confirm payment.</p></div>`:""}
       <div style="border-top:1px solid var(--line);padding-top:12px;margin-top:8px">
         ${o.items.map(i=>`<div class="row spread" style="padding:3px 0"><span>${esc(i.name)} × ${i.qty}</span><span class="price">${mvr(i.price*i.qty)}</span></div>`).join("")}
         <div class="row spread" style="margin-top:8px"><strong>Total</strong><strong class="price">${mvr(o.total)}</strong></div>
@@ -490,11 +494,22 @@ async function loadPay(oid,o){
   const bd=await db.collection("businesses").doc(o.bizId).get();
   const biz=bd.data()||{};
   const pz=$("payZone");if(!pz)return;
+  const hasBankDetails=biz.acceptsTransfer!==false&&(biz.bankName||biz.accountNumber);
   pz.innerHTML=`
-    ${biz.acceptsCard&&biz.cardLink?`<div class="pay-opt" id="poCard" onclick="selPay('card')"><h4>💳 Card payment</h4><div class="muted">Secure card payment</div></div>`:""}
-    ${biz.acceptsTransfer!==false?`<div class="pay-opt" id="poTransfer" onclick="selPay('transfer')"><h4>🏦 Bank transfer</h4><div class="muted">${biz.bankName?esc(biz.bankName)+" · "+esc(biz.accountNumber||"")+(biz.accountName?" · "+esc(biz.accountName):""):"Transfer to store account"}</div></div>`:""}
+    ${hasBankDetails?`<div style="background:var(--teal-soft);border:2px solid var(--teal);border-radius:12px;padding:14px;margin-bottom:12px">
+      <div style="font-weight:700;color:var(--teal-dark);margin-bottom:8px">🏦 Bank transfer details</div>
+      ${biz.bankName?`<div class="row spread" style="padding:4px 0"><span class="muted">Bank</span><strong>${esc(biz.bankName)}</strong></div>`:""}
+      ${biz.accountNumber?`<div class="row spread" style="padding:4px 0"><span class="muted">Account no.</span><strong style="font-family:monospace;font-size:15px">${esc(biz.accountNumber)}</strong></div>`:""}
+      ${biz.accountName?`<div class="row spread" style="padding:4px 0"><span class="muted">Account name</span><strong>${esc(biz.accountName)}</strong></div>`:""}
+      <div class="row spread" style="padding:4px 0;border-top:1px solid var(--teal);margin-top:8px"><span class="muted">Amount to transfer</span><strong class="price" style="font-size:17px">${mvr(o.total)}</strong></div>
+    </div>`:""}
+    ${biz.acceptsCard&&biz.cardLink?`<div class="pay-opt" id="poCard" onclick="selPay('card')"><h4>💳 Pay by card</h4><div class="muted">Tap to pay via card link</div></div>`:""}
+    ${biz.acceptsTransfer!==false?`<div class="pay-opt ${!biz.acceptsCard||!biz.cardLink?"sel":""}" id="poTransfer" onclick="selPay('transfer')"><h4>🏦 I've done the bank transfer</h4><div class="muted">Attach your transfer slip / receipt</div></div>`:""}
     <div id="payAction"></div>`;
   window._PB=biz;window._PO=oid;window._PT=o.total;
+  window._pastedSlip=null;
+  // Auto-show transfer section if no card option
+  if(!biz.acceptsCard||!biz.cardLink)selPay("transfer");
 }
 window.selPay=method=>{
   document.querySelectorAll(".pay-opt").forEach(el=>el.classList.remove("sel"));
@@ -505,22 +520,68 @@ window.selPay=method=>{
       <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:6px" onclick="confirmCardPay()">I've completed the payment</button>`;
   }else{
     $("poTransfer")?.classList.add("sel");
-    pa.innerHTML=`<label style="margin-top:12px">Upload your transfer slip</label>
-      <input type="file" id="slipFile" accept="image/*" onchange="prevSlip(this)">
-      <img id="slipPrev" style="display:none" class="slip-img">
-      <button class="btn btn-p" style="width:100%;margin-top:10px" id="submitSlipBtn">Submit slip</button>`;
-    $("submitSlipBtn").onclick=submitSlip;
+    pa.innerHTML=`
+      <div style="margin-top:12px">
+        <label style="margin-bottom:6px">Attach transfer slip / receipt</label>
+        <div id="pasteZone" tabindex="0"
+          style="border:2px dashed var(--line);border-radius:10px;padding:18px;text-align:center;cursor:pointer;transition:.15s;outline:none;margin-bottom:10px"
+          onclick="this.focus()"
+          onfocus="this.style.borderColor='var(--teal)'"
+          onblur="this.style.borderColor='var(--line)'"
+          onpaste="handleSlipPaste(event)">
+          <div style="font-size:22px;margin-bottom:6px">📋</div>
+          <div style="font-weight:600;font-size:14px">Click here, then Ctrl+V / ⌘V to paste</div>
+          <div class="muted" style="font-size:12px">Screenshot, photo or any image from clipboard</div>
+        </div>
+        <div class="row" style="align-items:center;gap:8px;margin-bottom:10px">
+          <hr style="flex:1;border:none;border-top:1px solid var(--line)">
+          <span class="muted" style="font-size:12px;white-space:nowrap">or upload a file</span>
+          <hr style="flex:1;border:none;border-top:1px solid var(--line)">
+        </div>
+        <input type="file" id="slipFile" accept="image/*" onchange="prevSlip(this)">
+        <img id="slipPrev" style="display:none;max-width:100%;max-height:200px;border-radius:8px;margin-top:8px;border:1px solid var(--line)">
+        <button class="btn btn-p" style="width:100%;margin-top:12px" id="submitSlipBtn" onclick="submitSlip()">Submit transfer slip</button>
+      </div>`;
   }
 };
-window.prevSlip=inp=>{const p=$("slipPrev");if(inp.files[0]){const r=new FileReader();r.onload=e=>{p.src=e.target.result;p.style.display="block"};r.readAsDataURL(inp.files[0])}};
+window.prevSlip=inp=>{
+  if(!inp.files[0])return;
+  const r=new FileReader();r.onload=e=>{
+    const p=$("slipPrev");if(p){p.src=e.target.result;p.style.display="block"}
+    window._pastedSlip=null; // file takes precedence
+  };r.readAsDataURL(inp.files[0]);
+};
+window.handleSlipPaste=async e=>{
+  const items=e.clipboardData?.items;if(!items)return;
+  for(const item of items){
+    if(item.type.startsWith("image/")){
+      e.preventDefault();
+      const file=item.getAsFile();
+      const b64=await compressImg(file,900,1100,0.65);
+      if(b64){
+        window._pastedSlip=b64;
+        const p=$("slipPrev");if(p){p.src=b64;p.style.display="block"}
+        const pz=$("pasteZone");if(pz){pz.style.borderColor="var(--teal)";pz.style.background="var(--teal-soft)";pz.innerHTML=`<div style="font-size:22px">✅</div><div style="font-weight:600;font-size:14px;color:var(--teal-dark)">Image pasted!</div>`}
+        toast("Image pasted — tap Submit to send");
+      }
+      break;
+    }
+  }
+};
 window.confirmCardPay=async()=>{await db.collection("orders").doc(window._PO).update({paymentStatus:"paid",paymentMethod:"card"});toast("Payment recorded — thank you!")};
 window.submitSlip=async()=>{
-  const f=$("slipFile")?.files[0];if(!f){toast("Please upload the transfer slip");return}
-  $("submitSlipBtn").disabled=true;toast("Uploading…");
-  const b64=await compressImg(f,900,1100,0.65);
-  if(!b64){toast("Could not read image");$("submitSlipBtn").disabled=false;return}
+  const btn=$("submitSlipBtn");
+  let b64=window._pastedSlip||null;
+  if(!b64){
+    const f=$("slipFile")?.files[0];
+    if(!f){toast("Please paste or upload your transfer slip first");return}
+    if(btn){btn.disabled=true;btn.textContent="Uploading…"}
+    b64=await compressImg(f,900,1100,0.65);
+  }else{if(btn){btn.disabled=true;btn.textContent="Submitting…"}}
+  if(!b64){toast("Could not read image");if(btn){btn.disabled=false;btn.textContent="Submit transfer slip"}return}
   await db.collection("orders").doc(window._PO).update({paymentStatus:"pending_transfer",paymentMethod:"transfer",transferSlip:b64});
-  toast("Slip submitted! Waiting for store to confirm.");
+  window._pastedSlip=null;
+  toast("✅ Slip submitted! The store will confirm your payment shortly.");
 };
 window.reqRefund=async oid=>{
   if(!confirm("Request a refund and cancel this order?"))return;
@@ -647,9 +708,29 @@ function bizOrders(){
   unsub.push(u);
 }
 window.setStatus=async(id,status)=>{
-  if(status==="cancelled"&&!confirm("Cancel this order?"))return;
+  if(status==="cancelled"){
+    openModal(`<h2>Cancel order</h2>
+      <p class="muted">The customer will see this reason on their tracking page.</p>
+      <label>Reason for cancellation</label>
+      <textarea id="cancelReason" rows="3" placeholder="e.g. Item out of stock · Unable to deliver to this address · Order placed by mistake…" style="resize:vertical"></textarea>
+      <div class="row" style="margin-top:14px">
+        <button class="btn btn-p" id="doCancelBtn" style="flex:1" onclick="doCancel('${id}')">Confirm cancellation</button>
+        <button class="btn btn-ghost" onclick="closeModal()">Go back</button>
+      </div>`);
+    return;
+  }
   await db.collection("orders").doc(id).update({status,history:FV.arrayUnion({status,at:new Date().toISOString()})});
   toast("Updated to: "+SL[status]);
+};
+window.doCancel=async id=>{
+  const reason=($("cancelReason").value||"").trim();
+  if(!reason){toast("Please enter a cancellation reason");return}
+  const btn=$("doCancelBtn");if(btn)btn.disabled=true;
+  await db.collection("orders").doc(id).update({
+    status:"cancelled",cancelReason:reason,
+    history:FV.arrayUnion({status:"cancelled",at:new Date().toISOString()})
+  });
+  closeModal();toast("Order cancelled");
 };
 window.confirmPay=async id=>{await db.collection("orders").doc(id).update({paymentStatus:"paid"});toast("Payment confirmed!")};
 window.markRefunded=async id=>{if(!confirm("Mark as refunded?"))return;await db.collection("orders").doc(id).update({paymentStatus:"refunded"});toast("Marked as refunded")};
@@ -876,24 +957,29 @@ window.parseBulkFile=async inp=>{
 window.doBulkImport=async()=>{
   const prods=window._blkProds||[];
   if(!prods.length){toast("Nothing to import");return}
-  const btn=$("blkBtn");if(btn){btn.disabled=true;btn.textContent="Importing…"}
+  const btn=$("blkBtn");if(btn){btn.disabled=true;btn.textContent="Checking duplicates…"}
+  const existing=await getExistingProdKeys(myBiz.id);
+  const toAdd=prods.filter(p=>{
+    const key=p.name.toLowerCase().trim()+"|"+p.price;
+    return!existing.has(key);
+  });
+  const skipped=prods.length-toAdd.length;
+  if(!toAdd.length){closeModal();toast("All products already exist — nothing new to add.");return}
+  if(btn)btn.textContent=`Importing ${toAdd.length}…`;
   const col=db.collection("businesses").doc(myBiz.id).collection("products");
-  // Firestore batch limit is 500 writes — chunk if needed
   const CHUNK=400;
-  for(let i=0;i<prods.length;i+=CHUNK){
+  for(let i=0;i<toAdd.length;i+=CHUNK){
     const batch=db.batch();
-    prods.slice(i,i+CHUNK).forEach(p=>batch.set(col.doc(),{
+    toAdd.slice(i,i+CHUNK).forEach(p=>batch.set(col.doc(),{
       name:p.name,desc:p.desc,price:p.price,unit:p.unit,
-      available:p.available&&p.price>0,
-      sortOrder:p.sortOrder,
-      imageData:"",imageUrl:"",catalogId:"",
-      createdAt:FV.serverTimestamp()
+      available:p.available&&p.price>0,sortOrder:p.sortOrder,
+      imageData:"",imageUrl:"",catalogId:"",createdAt:FV.serverTimestamp()
     }));
     await batch.commit();
-    if(btn)btn.textContent=`Importing… ${Math.min(i+CHUNK,prods.length)}/${prods.length}`;
+    if(btn)btn.textContent=`Importing… ${Math.min(i+CHUNK,toAdd.length)}/${toAdd.length}`;
   }
   closeModal();
-  toast(`✅ ${prods.length} products imported!`);
+  toast(`✅ ${toAdd.length} products imported${skipped?` · ${skipped} skipped (duplicates)`:""}!`);
 };
 
 /* Template downloads */
@@ -1401,9 +1487,10 @@ function adminCatalog(){
       <h3>Product catalog <span class="muted" id="catCount"></span></h3>
       <div class="row">
         <button class="btn btn-p btn-sm" style="background:var(--green)" onclick="seedCatalog()">🌱 Seed ${SEED_CATALOG.length} products</button>
-        <button class="btn btn-o btn-sm" onclick="importSupermartModal()">🛒 Import from Supermart</button>
+        <button class="btn btn-o btn-sm" onclick="adminBulkCatalog()">📊 Bulk upload</button>
         <button class="btn btn-o btn-sm" onclick="searchOFFModal()">🔍 Open Food Facts</button>
         <button class="btn btn-o btn-sm" onclick="addCatalogManual()">+ Add manually</button>
+        <button class="btn btn-danger btn-sm" onclick="dedupCatalog()">🔁 Remove duplicates</button>
       </div>
     </div>
     <div class="row" style="margin-bottom:12px;gap:8px">
@@ -1449,132 +1536,160 @@ window.filterCatalogList=q=>{
   renderCatalog(filtered);
 };
 
-/* ─── SUPERMART (estore.mv) IMPORT ─── */
-// Known Supermart products with confirmed image URLs, names, prices, categories
-const SUPERMART_KNOWN=[
-  {name:"Parboiled Rice",brand:"STO",unit:"10kg",category:"Staples & Grains",suggestedPrice:199,slug:"parboiled-rice-10002014-2050000018152"},
-  {name:"Happy Cow Cheese Spread",brand:"Happy Cow",unit:"150g",category:"Dairy & Eggs",suggestedPrice:35,slug:"happy-cow-cheese-spread-150g-10067747"},
-  {name:"Happy Cow Slice Cheese Cheddar",brand:"Happy Cow",unit:"200g",category:"Dairy & Eggs",suggestedPrice:48,slug:"happy-cow-slice-cheese-cheddar-200g-10086362"},
-  {name:"Happy Cow Slice Cheese Regular",brand:"Happy Cow",unit:"200g",category:"Dairy & Eggs",suggestedPrice:45,slug:"happy-cow-slice-cheese-regular-200g-10067751"},
-  {name:"Happy Cow Processed Cheese",brand:"Happy Cow",unit:"340g",category:"Dairy & Eggs",suggestedPrice:75,slug:"happy-cow-processed-cheese-340g-------10067749"},
-  {name:"Superchef White Vinegar",brand:"Superchef",unit:"1L",category:"Cooking Oils & Condiments",suggestedPrice:19,slug:"superchef-white-vinegar-1l-10064301"},
-  {name:"Superchef Toor Dhaal Yellow",brand:"Superchef",unit:"500g",category:"Canned & Tinned",suggestedPrice:18,slug:"superchef-toor-dhaal-yellow---500g-10064343"},
-  {name:"Safa Tomato Paste",brand:"Safa",unit:"70g",category:"Cooking Oils & Condiments",suggestedPrice:4,slug:"safa-tomato-paste-70g-000000000010006821"},
-  {name:"Bayara Paprika Powder",brand:"Bayara",unit:"100g",category:"Spices & Seasoning",suggestedPrice:22,slug:"bayara-paprika-powder-100ml-10056461"},
-  {name:"Tunisian Dates",brand:"",unit:"500g",category:"Snacks & Biscuits",suggestedPrice:45,slug:"tunisian-dates-500g-10007178"},
-];
-const CORS_PROXY="https://api.allorigins.win/get?url=";
-async function fetchSupermartProduct(slug){
-  try{
-    const r=await fetch(CORS_PROXY+encodeURIComponent("https://estore.mv/Product/Index/"+slug));
-    const d=await r.json();
-    const html=d.contents||"";
-    // Extract name from <title>
-    const nameM=html.match(/<title>([^<]+)<\/title>/i);
-    const name=nameM?nameM[1].trim():"";
-    // Extract price
-    const priceM=html.match(/MVR\s*([\d.]+)/);
-    const price=priceM?parseFloat(priceM[1]):0;
-    // Extract image (Uploads/Products path, not Thumbnails)
-    const imgM=html.match(/https:\/\/estore\.mv\/Uploads\/Products\/(?!Thumbnails)[^"'\s]+\.jpg/);
-    const imageUrl=imgM?imgM[0]:"";
-    // Extract category
-    const catM=html.match(/In stock[\s\S]{0,60}?\d{6,}\s*\n\s*([^\n<]+)/);
-    const category=catM?catM[1].trim():"";
-    return{name,price,imageUrl,category,slug};
-  }catch{return null}
+/* ─── DUPLICATE CHECKER HELPERS ─── */
+async function getExistingProdKeys(bizId){
+  const snap=await db.collection("businesses").doc(bizId).collection("products").get();
+  return new Set(snap.docs.map(d=>{const x=d.data();return(x.name||"").toLowerCase().trim()+"|"+x.price}));
 }
-window.importSupermartModal=()=>{
-  openModal(`<h2>🛒 Import from STO Supermart</h2>
-    <p class="muted">Paste estore.mv product URL(s) — one per line — or use the quick-add list below.</p>
-    <textarea id="smUrls" rows="4" placeholder="https://estore.mv/Product/Index/product-name-10012345&#10;https://estore.mv/Product/Index/another-product-10067890" style="font-size:12px;font-family:monospace"></textarea>
-    <button class="btn btn-p btn-sm" style="margin-top:8px" onclick="scrapeSupermartUrls()">🔍 Fetch & preview</button>
-    <hr style="border:none;border-top:1px solid var(--line);margin:14px 0">
-    <p style="font-weight:600;margin-bottom:8px">Quick-add known Supermart products (${SUPERMART_KNOWN.length} items)</p>
-    <div style="max-height:240px;overflow:auto" class="cat-grid">${SUPERMART_KNOWN.map((p,i)=>`
-      <div class="cat-card selectable" id="smk_${i}" onclick="toggleSMSel(${i})">
-        <div class="sel-check">✓</div>
-        <div class="iname">${esc(p.name)}</div>
-        <div class="muted">${esc(p.brand)} · ${esc(p.unit)}</div>
-        <div class="price" style="font-size:12px;margin-top:4px">${mvr(p.suggestedPrice)}</div>
-      </div>`).join("")}</div>
-    <button class="btn btn-p" style="width:100%;margin-top:12px" id="smAddKnownBtn">Add selected (0) — images fetched from Supermart</button>
-    <div id="smScrapeOut" style="margin-top:12px"></div>`);
-  window._smSel=new Set();
-  $("smAddKnownBtn").onclick=addKnownSupermart;
+async function getCatalogNames(){
+  const snap=await db.collection("catalog").get();
+  return new Set(snap.docs.map(d=>(d.data().name||"").toLowerCase().trim()));
+}
+
+/* ─── ADMIN: BULK CATALOG UPLOAD ─── */
+window.adminBulkCatalog=()=>{
+  window._adminBlkItems=[];
+  openModal(`<h2>📊 Bulk upload to catalog</h2>
+    <p class="muted">Upload an Excel (.xlsx) or CSV file. First row = headers. Duplicate names are skipped automatically.</p>
+    <div style="background:var(--bg);border-radius:8px;padding:12px;margin:12px 0;font-size:13px">
+      <div style="font-weight:600;margin-bottom:6px">Supported columns:</div>
+      <div class="row" style="gap:6px;flex-wrap:wrap">
+        <span class="badge b-active">name ✱</span>
+        <span class="badge b-accepted">brand</span>
+        <span class="badge b-accepted">unit</span>
+        <span class="badge b-accepted">category</span>
+        <span class="badge b-accepted">price / suggestedPrice</span>
+      </div>
+    </div>
+    <div class="row" style="gap:8px;margin-bottom:14px">
+      <button class="btn btn-p btn-sm" onclick="dlAdminCatalogXLS()">⬇ Excel template</button>
+      <button class="btn btn-o btn-sm" onclick="dlAdminCatalogCSV()">⬇ CSV template</button>
+    </div>
+    <label>Choose file (.csv, .xlsx, .xls)</label>
+    <input type="file" id="adminBlkFile" accept=".csv,.xlsx,.xls" onchange="parseAdminBulk(this)">
+    <div id="adminBlkPrev" style="margin-top:14px"></div>
+    <button class="btn btn-p" style="width:100%;margin-top:12px;display:none" id="adminBlkBtn" onclick="doAdminBulkImport()">Import to catalog</button>`);
 };
-window.toggleSMSel=i=>{
-  const card=$("smk_"+i);if(!card)return;
-  if(window._smSel.has(i)){window._smSel.delete(i);card.classList.remove("selected")}
-  else{window._smSel.add(i);card.classList.add("selected")}
-  $("smAddKnownBtn").textContent=window._smSel.size?"Add selected ("+window._smSel.size+") — images fetched from Supermart":"Add selected (0) — images fetched from Supermart";
+window.parseAdminBulk=async inp=>{
+  const file=inp.files[0];if(!file)return;
+  $("adminBlkPrev").innerHTML=`<div class="muted">Reading…</div>`;
+  const ext=file.name.split(".").pop().toLowerCase();
+  let rows=[];
+  try{
+    if(ext==="csv"){
+      const text=await file.text();
+      rows=text.split(/\r?\n/).filter(l=>l.trim()).map(l=>{
+        const res=[],len=l.length;let cur="",inQ=false;
+        for(let i=0;i<len;i++){const c=l[i];if(c==='"'){inQ=!inQ}else if(c===","&&!inQ){res.push(cur.trim());cur=""}else cur+=c}
+        res.push(cur.trim());return res;
+      });
+    }else{
+      if(typeof XLSX==="undefined"){toast("Excel library not ready — try again");return}
+      const buf=await file.arrayBuffer();
+      const wb=XLSX.read(buf,{type:"array"});
+      rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:""});
+    }
+  }catch{$("adminBlkPrev").innerHTML=`<p style="color:var(--red)">Could not read file.</p>`;return}
+  if(rows.length<2){$("adminBlkPrev").innerHTML=`<p style="color:var(--red)">File is empty or has only headers.</p>`;return}
+  const headers=rows[0].map(h=>(h||"").toString().toLowerCase().trim());
+  const fi=(...k)=>headers.findIndex(h=>k.includes(h));
+  const ci={name:fi("name","product","item"),brand:fi("brand"),unit:fi("unit","size","weight"),category:fi("category","cat"),price:fi("price","suggestedprice","suggested price","cost","mvr")};
+  if(ci.name<0){$("adminBlkPrev").innerHTML=`<p style="color:var(--red)">No "name" column found. Headers: ${esc(rows[0].join(", "))}</p>`;return}
+  window._adminBlkItems=rows.slice(1).filter(r=>r.some(c=>c!=null&&c!=="")).map(row=>({
+    name:(row[ci.name]||"").toString().trim(),
+    brand:ci.brand>=0?(row[ci.brand]||"").toString().trim():"",
+    unit:ci.unit>=0?(row[ci.unit]||"").toString().trim():"",
+    category:ci.category>=0?(row[ci.category]||"").toString().trim():"",
+    suggestedPrice:ci.price>=0?Math.round(parseFloat((row[ci.price]||"").toString().replace(/[^\d.]/g,""))||0):"",
+  })).filter(p=>p.name);
+  const items=window._adminBlkItems;
+  if(!items.length){$("adminBlkPrev").innerHTML=`<p style="color:var(--red)">No valid rows found.</p>`;return}
+  $("adminBlkPrev").innerHTML=`
+    <div class="muted" style="margin-bottom:8px"><strong>${items.length}</strong> items found — duplicates will be skipped on import</div>
+    <div style="overflow:auto;border-radius:10px;border:1px solid var(--line)">
+      <table style="min-width:400px"><thead><tr><th>Name</th><th>Brand</th><th>Unit</th><th>Category</th><th>Price</th></tr></thead>
+      <tbody>${items.slice(0,10).map(p=>`<tr>
+        <td><strong>${esc(p.name)}</strong></td>
+        <td class="muted">${esc(p.brand)||"—"}</td>
+        <td class="muted">${esc(p.unit)||"—"}</td>
+        <td class="muted">${esc(p.category)||"—"}</td>
+        <td class="price">${p.suggestedPrice?mvr(p.suggestedPrice):"—"}</td>
+      </tr>`).join("")}
+      ${items.length>10?`<tr><td colspan="5" class="muted" style="text-align:center;padding:8px">…and ${items.length-10} more</td></tr>`:""}</tbody></table>
+    </div>`;
+  const btn=$("adminBlkBtn");if(btn){btn.style.display="block";btn.textContent=`Import ${items.length} items to catalog`}
 };
-window.addKnownSupermart=async()=>{
-  if(!window._smSel.size){toast("Select at least one product");return}
-  $("smAddKnownBtn").disabled=true;
-  const sel=[...window._smSel].map(i=>SUPERMART_KNOWN[i]);
-  $("smScrapeOut").innerHTML=`<div class="muted">Fetching ${sel.length} products from Supermart…</div>`;
-  const results=[];
-  for(const p of sel){
-    $("smScrapeOut").innerHTML=`<div class="muted">Fetching: ${esc(p.name)}…</div>`;
-    const fetched=await fetchSupermartProduct(p.slug);
-    results.push({
-      name:fetched?.name||p.name,
-      brand:p.brand,unit:p.unit,
-      category:p.category,
-      suggestedPrice:fetched?.price||p.suggestedPrice,
-      imageUrl:fetched?.imageUrl||""
-    });
-    await new Promise(r=>setTimeout(r,400));
+window.doAdminBulkImport=async()=>{
+  const items=window._adminBlkItems||[];if(!items.length)return;
+  const btn=$("adminBlkBtn");if(btn){btn.disabled=true;btn.textContent="Checking duplicates…"}
+  const existing=await getCatalogNames();
+  const toAdd=items.filter(p=>!existing.has(p.name.toLowerCase().trim()));
+  const skipped=items.length-toAdd.length;
+  if(!toAdd.length){closeModal();toast("All items already exist in catalog — nothing new to add.");return}
+  if(btn)btn.textContent=`Importing ${toAdd.length} items…`;
+  const CHUNK=400;
+  for(let i=0;i<toAdd.length;i+=CHUNK){
+    const batch=db.batch();
+    toAdd.slice(i,i+CHUNK).forEach(p=>batch.set(db.collection("catalog").doc(),{
+      name:p.name,brand:p.brand||"",unit:p.unit||"",category:p.category||"",
+      suggestedPrice:Number(p.suggestedPrice)||0,imageUrl:"",createdAt:FV.serverTimestamp()
+    }));
+    await batch.commit();
   }
-  const batch=db.batch();
-  results.forEach(item=>batch.set(db.collection("catalog").doc(),{...item,createdAt:FV.serverTimestamp()}));
-  await batch.commit();
   closeModal();
-  toast(results.length+" Supermart products added to catalog!");
+  toast(`✅ ${toAdd.length} items added${skipped?` · ${skipped} skipped (duplicates)`:""}!`);
   loadCatalog();
 };
-window.scrapeSupermartUrls=async()=>{
-  const raw=$("smUrls").value.trim();if(!raw)return;
-  const urls=raw.split("\n").map(u=>u.trim()).filter(u=>u.includes("estore.mv/Product/Index/"));
-  if(!urls.length){toast("No valid estore.mv URLs found");return}
-  $("smScrapeOut").innerHTML=`<div class="muted">Fetching ${urls.length} product(s)…</div>`;
-  const results=[];
-  for(const url of urls){
-    const slug=url.split("/Product/Index/")[1]||"";
-    const p=await fetchSupermartProduct(slug);
-    if(p&&p.name)results.push(p);
-    await new Promise(r=>setTimeout(r,400));
-  }
-  if(!results.length){$("smScrapeOut").innerHTML=`<p style="color:var(--red)">Could not fetch products. Check the URLs and try again.</p>`;return}
-  $("smScrapeOut").innerHTML=`
-    <p style="font-weight:600;margin-bottom:8px">Found ${results.length} product(s):</p>
-    <div class="cat-grid">${results.map((p,i)=>`
-      <div class="cat-card selectable selected" id="smr_${i}" onclick="this.classList.toggle('selected')">
-        <div class="sel-check">✓</div>
-        ${p.imageUrl?`<img src="${p.imageUrl}" onerror="this.style.display='none'" style="width:70px;height:70px;object-fit:contain;margin:0 auto 8px;display:block">`:""}
-        <div class="iname">${esc(p.name)}</div>
-        <div class="price" style="font-size:12px;margin-top:4px">${p.price?mvr(p.price):""}</div>
-        <label style="font-size:11px;margin-top:6px">Category</label>
-        <input value="${esc(p.category||"")}" id="smc_${i}" style="font-size:11px;padding:4px 6px">
-      </div>`).join("")}</div>
-    <button class="btn btn-p" style="width:100%;margin-top:12px" onclick="confirmScrapedSupermart()">Add selected to catalog</button>`;
-  window._smScraped=results;
+window.dlAdminCatalogXLS=()=>{
+  if(typeof XLSX==="undefined"){toast("Try again in a moment");return}
+  const ws=XLSX.utils.aoa_to_sheet([
+    ["name","brand","unit","category","price"],
+    ["Jasmine Rice","Kaalar","5kg","Staples & Grains",85],
+    ["Sunflower Oil","","1L","Cooking Oils & Condiments",35],
+    ["Tuna Chunks in Brine","Fasmeeru","180g","Canned & Tinned",17],
+  ]);
+  ws["!cols"]=[{wch:30},{wch:16},{wch:12},{wch:24},{wch:10}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Catalog");
+  XLSX.writeFile(wb,"kleio_catalog_template.xlsx");
 };
-window.confirmScrapedSupermart=async()=>{
-  const batch=db.batch();
-  (window._smScraped||[]).forEach((p,i)=>{
-    const card=$("smr_"+i);if(!card?.classList.contains("selected"))return;
-    batch.set(db.collection("catalog").doc(),{
-      name:p.name,brand:"",unit:"",
-      category:$("smc_"+i)?.value.trim()||p.category||"Grocery",
-      suggestedPrice:p.price||0,imageUrl:p.imageUrl||"",
-      createdAt:FV.serverTimestamp()
-    });
+window.dlAdminCatalogCSV=()=>{
+  const csv="name,brand,unit,category,price\nJasmine Rice,Kaalar,5kg,Staples & Grains,85\nSunflower Oil,,1L,Cooking Oils & Condiments,35";
+  const a=document.createElement("a");a.href="data:text/csv,"+encodeURIComponent(csv);a.download="kleio_catalog_template.csv";a.click();
+};
+
+/* ─── ADMIN: DEDUP CATALOG ─── */
+window.dedupCatalog=async()=>{
+  const snap=await db.collection("catalog").get();
+  const docs=snap.docs;
+  if(!docs.length){toast("Catalog is empty");return}
+  const seen={};const toDelete=[];
+  docs.forEach(doc=>{
+    const name=(doc.data().name||"").toLowerCase().trim();
+    if(!seen[name]){
+      seen[name]={id:doc.id,hasImg:!!(doc.data().imageUrl),price:doc.data().suggestedPrice||0};
+    }else{
+      const ex=seen[name];const nd=doc.data();
+      const newBetter=(nd.imageUrl&&!ex.hasImg)||(nd.suggestedPrice&&!ex.price);
+      if(newBetter){toDelete.push(ex.id);seen[name]={id:doc.id,hasImg:!!(nd.imageUrl),price:nd.suggestedPrice||0}}
+      else toDelete.push(doc.id);
+    }
   });
-  await batch.commit();
-  closeModal();toast("Products added to catalog!");loadCatalog();
+  if(!toDelete.length){toast("✅ No duplicates found in catalog!");return}
+  if(!confirm(`Found ${toDelete.length} duplicate catalog item${toDelete.length>1?"s":""}. Remove them? Better entries (with images/prices) are kept.`))return;
+  const CHUNK=400;
+  for(let i=0;i<toDelete.length;i+=CHUNK){
+    const batch=db.batch();
+    toDelete.slice(i,i+CHUNK).forEach(id=>batch.delete(db.collection("catalog").doc(id)));
+    await batch.commit();
+  }
+  toast(`🗑️ Removed ${toDelete.length} duplicate${toDelete.length>1?"s":""}`);
+  loadCatalog();
 };
+
+/* ─── PLACEHOLDER for removed Supermart section ─── */
+const _SM_REMOVED=true; // Supermart import removed per admin preference
+
+/* Open Food Facts search & import */
 
 /* Open Food Facts search & import */
 window.searchOFFModal=()=>{
@@ -1681,16 +1796,22 @@ window.bizAddFromCatalog=async()=>{
     <button class="btn btn-p" style="width:100%;margin-top:12px" id="addSelBtn">Select items to add</button>`);
   $("addSelBtn").onclick=async()=>{
     if(!window._catSel.size){toast("Select at least one item");return}
-    $("addSelBtn").disabled=true;$("addSelBtn").textContent="Adding…";
+    $("addSelBtn").disabled=true;$("addSelBtn").textContent="Checking duplicates…";
+    const existing=await getExistingProdKeys(myBiz.id);
     const col=db.collection("businesses").doc(myBiz.id).collection("products");
     const batch=db.batch();
+    let added=0,skipped=0;
     window._catSel.forEach(id=>{
       const item=window._catItems.find(i=>i.id===id);
-      if(item)batch.set(col.doc(),{name:item.name,desc:(item.brand?item.brand+" ":"")+( item.unit||""),price:item.suggestedPrice||0,available:!!(item.suggestedPrice>0),sortOrder:99,imageUrl:item.imageUrl||"",imageData:"",catalogId:item.id,createdAt:FV.serverTimestamp()});
+      if(!item)return;
+      const key=item.name.toLowerCase().trim()+"|"+(item.suggestedPrice||0);
+      if(existing.has(key)){skipped++;return}
+      batch.set(col.doc(),{name:item.name,desc:(item.brand?item.brand+" ":"")+( item.unit||""),price:item.suggestedPrice||0,available:!!(item.suggestedPrice>0),sortOrder:99,imageUrl:item.imageUrl||"",imageData:"",catalogId:item.id,createdAt:FV.serverTimestamp()});
+      added++;
     });
-    await batch.commit();
+    if(added)await batch.commit();
     closeModal();
-    toast(window._catSel.size+" items added with suggested prices — review and adjust in Products");
+    toast(added?`${added} item${added>1?"s":""} added${skipped?` · ${skipped} skipped (duplicates)`:""}!`:"All selected items already in your products.");
     bizProds();
   };
 };
