@@ -499,7 +499,11 @@ async function loadPay(oid,o){
     ${hasBankDetails?`<div style="background:var(--teal-soft);border:2px solid var(--teal);border-radius:12px;padding:14px;margin-bottom:12px">
       <div style="font-weight:700;color:var(--teal-dark);margin-bottom:8px">🏦 Bank transfer details</div>
       ${biz.bankName?`<div class="row spread" style="padding:4px 0"><span class="muted">Bank</span><strong>${esc(biz.bankName)}</strong></div>`:""}
-      ${biz.accountNumber?`<div class="row spread" style="padding:4px 0"><span class="muted">Account no.</span><strong style="font-family:monospace;font-size:15px">${esc(biz.accountNumber)}</strong></div>`:""}
+      ${biz.accountNumber?`<div class="row spread" style="padding:4px 0"><span class="muted">Account no.</span>
+        <div class="row" style="gap:6px">
+          <strong style="font-family:monospace;font-size:15px">${esc(biz.accountNumber)}</strong>
+          <button onclick="copyText('${esc(biz.accountNumber)}')" title="Copy account number" style="background:var(--teal-soft);border:none;border-radius:7px;padding:4px 9px;cursor:pointer;font-size:13px;color:var(--teal-dark);font-weight:700">📋</button>
+        </div></div>`:""}
       ${biz.accountName?`<div class="row spread" style="padding:4px 0"><span class="muted">Account name</span><strong>${esc(biz.accountName)}</strong></div>`:""}
       <div class="row spread" style="padding:4px 0;border-top:1px solid var(--teal);margin-top:8px"><span class="muted">Amount to transfer</span><strong class="price" style="font-size:17px">${mvr(o.total)}</strong></div>
     </div>`:""}
@@ -607,8 +611,20 @@ function bizAuth(){
     <button class="btn btn-p" style="width:100%;margin-top:16px" id="bLogin">Sign in</button>
     <button class="btn btn-o" style="width:100%;margin-top:8px" id="bCreate">Create account</button>
   </div>`;
-  $("bLogin").onclick=async()=>{try{await auth.signInWithEmailAndPassword($("bEmail").value.trim(),$("bPass").value)}catch(e){toast(e.message)}};
-  $("bCreate").onclick=async()=>{const e=$("bEmail").value.trim(),p=$("bPass").value;if(!e||p.length<6){toast("Email and 6+ char password required");return}try{await auth.createUserWithEmailAndPassword(e,p)}catch(err){toast(err.message)}};
+  $("bLogin").onclick=async()=>{
+    const btn=$("bLogin"),em=$("bEmail").value.trim(),pw=$("bPass").value;
+    if(!em||!pw){toast("Enter email and password");return}
+    btn.disabled=true;btn.textContent="Signing in…";
+    try{await auth.signInWithEmailAndPassword(em,pw);app.innerHTML=`<div class="empty"><div class="big">⏳</div>Loading your dashboard…</div>`}
+    catch(e){toast(e.message);btn.disabled=false;btn.textContent="Sign in"}
+  };
+  $("bCreate").onclick=async()=>{
+    const btn=$("bCreate"),em=$("bEmail").value.trim(),pw=$("bPass").value;
+    if(!em||pw.length<6){toast("Email and 6+ char password required");return}
+    btn.disabled=true;btn.textContent="Creating account…";
+    try{await auth.createUserWithEmailAndPassword(em,pw);app.innerHTML=`<div class="empty"><div class="big">⏳</div>Setting up your account…</div>`}
+    catch(err){toast(err.message);btn.disabled=false;btn.textContent="Create account"}
+  };
 }
 function bizReg(){
   app.innerHTML=`<div class="card" style="max-width:480px;margin:30px auto">
@@ -686,8 +702,11 @@ function bizOrders(){
         </div>
         <div class="muted" style="margin:5px 0 8px">${fmtDate(o.createdAt)} · ${esc(o.customer?.name)} · ${esc(o.customer?.phone)}<br>${esc(o.customer?.address)}${o.customer?.note?`<br>📝 ${esc(o.customer.note)}`:""}</div>
         ${o.transferSlip?`<div style="margin-bottom:10px">
-          <img src="${o.transferSlip}" style="max-width:100%;max-height:130px;border-radius:8px;border:1px solid var(--line)">
-          ${o.paymentStatus==="pending_transfer"?`<button class="btn btn-p btn-sm" style="margin-top:6px" onclick="confirmPay('${o.id}')">✅ Confirm payment</button>`:""}</div>`:""}
+          <img src="${o.transferSlip}" onclick="viewSlip('${o.id}')" style="max-width:100%;max-height:110px;border-radius:8px;border:1px solid var(--line);cursor:zoom-in;display:block">
+          <div class="row" style="margin-top:6px;gap:6px">
+            <button class="btn btn-o btn-sm" onclick="viewSlip('${o.id}')">🔍 View slip</button>
+            ${o.paymentStatus==="pending_transfer"?`<button class="btn btn-p btn-sm" onclick="confirmPay('${o.id}')">✅ Confirm payment</button>`:""}
+          </div></div>`:""}
         ${o.paymentStatus==="refund_requested"?`<div style="background:var(--purple-soft);color:var(--purple);padding:8px 12px;border-radius:8px;margin-bottom:8px;font-weight:600">
           ⚠️ Customer requested refund
           <button class="btn btn-sm btn-o" style="margin-left:8px" onclick="markRefunded('${o.id}')">Mark refunded</button></div>`:""}
@@ -733,6 +752,17 @@ window.doCancel=async id=>{
   closeModal();toast("Order cancelled");
 };
 window.confirmPay=async id=>{await db.collection("orders").doc(id).update({paymentStatus:"paid"});toast("Payment confirmed!")};
+window.viewSlip=id=>{
+  const o=window._BO?.[id];if(!o?.transferSlip)return;
+  openModal(`<div style="margin:-4px -4px 12px;display:flex;justify-content:space-between;align-items:center">
+    <h2 style="margin:0">Transfer slip</h2>
+    <div class="row" style="gap:8px">
+      ${o.paymentStatus==="pending_transfer"?`<button class="btn btn-p btn-sm" onclick="confirmPay('${id}');closeModal()">✅ Confirm payment</button>`:""}
+      <button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button>
+    </div></div>
+    <img src="${o.transferSlip}" style="max-width:100%;border-radius:8px;border:1px solid var(--line);display:block">
+    <div class="muted" style="margin-top:8px;font-size:12px">Order ${esc(o.code)} · ${esc(o.customer?.name||"")} · ${mvr(o.total)}</div>`);
+};
 window.markRefunded=async id=>{if(!confirm("Mark as refunded?"))return;await db.collection("orders").doc(id).update({paymentStatus:"refunded"});toast("Marked as refunded")};
 window.editOrder=id=>{
   const o=window._BO[id];
@@ -1119,7 +1149,13 @@ function vAdmin(){
       <h2>Admin sign in</h2><label>Email</label><input id="aEmail" type="email"><label>Password</label><input id="aPass" type="password">
       <button class="btn btn-p" style="width:100%;margin-top:16px" id="aLogin">Sign in</button>
     </div>`;
-    $("aLogin").onclick=async()=>{try{await auth.signInWithEmailAndPassword($("aEmail").value.trim(),$("aPass").value)}catch(e){toast(e.message)}};
+    $("aLogin").onclick=async()=>{
+      const btn=$("aLogin"),em=$("aEmail").value.trim(),pw=$("aPass").value;
+      if(!em||!pw){toast("Enter email and password");return}
+      btn.disabled=true;btn.textContent="Signing in…";
+      try{await auth.signInWithEmailAndPassword(em,pw);app.innerHTML=`<div class="empty"><div class="big">⏳</div>Loading admin panel…</div>`}
+      catch(e){toast(e.message);btn.disabled=false;btn.textContent="Sign in"}
+    };
     return;
   }
   app.innerHTML=`
@@ -1416,6 +1452,17 @@ window.seedCatalog=async()=>{
   if($("seedDetail"))$("seedDetail").textContent="Businesses can now browse and add these to their stores.";
   setTimeout(()=>{closeModal();loadCatalog();},2500);
 };
+
+/* ── copy to clipboard ── */
+window.copyText=text=>{
+  if(navigator.clipboard){navigator.clipboard.writeText(text).then(()=>toast("✅ Copied!")).catch(()=>fallbackCopy(text))}
+  else fallbackCopy(text);
+};
+function fallbackCopy(text){
+  const el=document.createElement("textarea");el.value=text;el.style.position="fixed";el.style.opacity="0";
+  document.body.appendChild(el);el.select();document.execCommand("copy");
+  document.body.removeChild(el);toast("✅ Copied!");
+}
 
 /* =========================================================
    SHARE STORE
@@ -1777,10 +1824,24 @@ window.bizAddFromCatalog=async()=>{
   const items=snap.docs.map(d=>({id:d.id,...d.data()}));
   if(!items.length){toast("Catalog is empty — ask the portal admin to add items.");bizProds();return}
   window._catItems=items;window._catSel=new Set();
+  const cats=[...new Set(items.map(i=>i.category||"").filter(Boolean))].sort();
   openModal(`<h2>Add from catalog</h2>
-    <p class="muted">Select items to add to your products. Set prices after to make them available.</p>
-    <input id="catMF" placeholder="Search catalog…" oninput="filterCatModal(this.value)" style="margin-bottom:10px">
-    <div style="max-height:360px;overflow:auto">
+    <p class="muted">${items.length} items available. Tap to select, tap again to deselect.</p>
+    <div class="row" style="gap:6px;margin-bottom:10px;flex-wrap:wrap">
+      <input id="catMF" placeholder="Search…" oninput="filterCatModal(this.value)" style="flex:1;min-width:140px">
+      <select id="catMCat" onchange="filterCatModal($('catMF').value)" style="width:auto">
+        <option value="">All categories</option>
+        ${cats.map(c=>`<option>${esc(c)}</option>`).join("")}
+      </select>
+    </div>
+    <div class="row spread" style="margin-bottom:8px">
+      <span class="muted" id="catMCount" style="font-size:13px">0 selected</span>
+      <div class="row" style="gap:6px">
+        <button class="btn btn-o btn-sm" onclick="selectAllCat(true)">Select all</button>
+        <button class="btn btn-ghost btn-sm" onclick="selectAllCat(false)">Clear</button>
+      </div>
+    </div>
+    <div style="max-height:340px;overflow:auto">
       <div class="cat-grid" id="catMGrid">${items.map(item=>`
         <div class="cat-card selectable" id="ci_${item.id}" onclick="toggleCatSel('${item.id}')">
           <div class="sel-check">✓</div>
@@ -1815,15 +1876,36 @@ window.bizAddFromCatalog=async()=>{
     bizProds();
   };
 };
+function updateCatSelUI(){
+  const n=window._catSel.size;
+  const btn=$("addSelBtn");
+  if(btn)btn.textContent=n?`Add ${n} selected item${n>1?"s":""} to my products`:"Select items to add";
+  const cnt=$("catMCount");
+  if(cnt)cnt.textContent=n?`${n} item${n>1?"s":""} selected`:"0 selected";
+}
 window.toggleCatSel=id=>{
   const card=$("ci_"+id);if(!card)return;
   if(window._catSel.has(id)){window._catSel.delete(id);card.classList.remove("selected")}
   else{window._catSel.add(id);card.classList.add("selected")}
-  $("addSelBtn").textContent=window._catSel.size?`Add ${window._catSel.size} selected item${window._catSel.size>1?"s":""}`:"Select items to add";
+  updateCatSelUI();
+};
+window.selectAllCat=select=>{
+  document.querySelectorAll("#catMGrid .cat-card:not([style*='display: none']):not([style*='display:none'])").forEach(card=>{
+    const id=card.id.replace("ci_","");
+    if(select){window._catSel.add(id);card.classList.add("selected")}
+    else{window._catSel.delete(id);card.classList.remove("selected")}
+  });
+  updateCatSelUI();
 };
 window.filterCatModal=v=>{
-  const l=v.toLowerCase();
-  document.querySelectorAll("#catMGrid .cat-card").forEach(c=>c.style.display=c.textContent.toLowerCase().includes(l)?"":"none");
+  const txt=(v||"").toLowerCase();
+  const cat=$("catMCat")?.value||"";
+  document.querySelectorAll("#catMGrid .cat-card").forEach(c=>{
+    const text=c.textContent.toLowerCase();
+    const matchTxt=!txt||text.includes(txt);
+    const matchCat=!cat||text.includes(cat.toLowerCase());
+    c.style.display=matchTxt&&matchCat?"":"none";
+  });
 };
 
 /* combined status badge HTML used on both customer & business sides */
