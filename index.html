@@ -754,14 +754,23 @@ window.doCancel=async id=>{
 window.confirmPay=async id=>{await db.collection("orders").doc(id).update({paymentStatus:"paid"});toast("Payment confirmed!")};
 window.viewSlip=id=>{
   const o=window._BO?.[id];if(!o?.transferSlip)return;
-  openModal(`<div style="margin:-4px -4px 12px;display:flex;justify-content:space-between;align-items:center">
+  openModal(`<div style="margin:-4px -4px 12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
     <h2 style="margin:0">Transfer slip</h2>
-    <div class="row" style="gap:8px">
+    <div class="row" style="gap:6px">
       ${o.paymentStatus==="pending_transfer"?`<button class="btn btn-p btn-sm" onclick="confirmPay('${id}');closeModal()">✅ Confirm payment</button>`:""}
+      <button class="btn btn-o btn-sm" onclick="downloadSlip('${id}')">⬇ Download</button>
       <button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button>
     </div></div>
-    <img src="${o.transferSlip}" style="max-width:100%;border-radius:8px;border:1px solid var(--line);display:block">
-    <div class="muted" style="margin-top:8px;font-size:12px">Order ${esc(o.code)} · ${esc(o.customer?.name||"")} · ${mvr(o.total)}</div>`);
+  <img src="${o.transferSlip}" style="max-width:100%;border-radius:8px;border:1px solid var(--line);display:block">
+  <div class="muted" style="margin-top:8px;font-size:12px">Order ${esc(o.code)} · ${esc(o.customer?.name||"")} · ${mvr(o.total)}${o.paymentStatus==="paid"?` <span style="color:var(--green)">· ✅ Payment confirmed</span>`:""}</div>`);
+};
+window.downloadSlip=id=>{
+  const o=window._BO?.[id];if(!o?.transferSlip)return;
+  const a=document.createElement("a");
+  a.href=o.transferSlip;
+  a.download=`slip-${o.code}.jpg`;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  toast("Downloading slip…");
 };
 window.markRefunded=async id=>{if(!confirm("Mark as refunded?"))return;await db.collection("orders").doc(id).update({paymentStatus:"refunded"});toast("Marked as refunded")};
 window.editOrder=id=>{
