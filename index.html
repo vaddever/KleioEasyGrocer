@@ -33,11 +33,12 @@ label{display:block;font-size:13px;font-weight:600;color:var(--ink-soft);margin:
 
 header{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:50}
 .hwrap{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:14px;padding:12px 20px}
-.brand{font-weight:800;font-size:19px;color:var(--ink)}.brand b{color:var(--teal)}
-nav{margin-left:auto;display:flex;gap:4px;align-items:center;flex-wrap:wrap}
-nav a{padding:7px 12px;border-radius:8px;color:var(--ink-soft);font-weight:600;font-size:14px}
+.brand{font-weight:800;font-size:19px;color:var(--ink);white-space:nowrap}.brand b{color:var(--teal)}
+nav{margin-left:auto;display:flex;gap:4px;align-items:center}
+nav a{padding:7px 12px;border-radius:8px;color:var(--ink-soft);font-weight:600;font-size:14px;white-space:nowrap}
 nav a.active,nav a:hover{background:var(--teal-soft);color:var(--teal-dark)}
-.cartbtn{position:relative}
+.cartbtn{position:relative;padding:6px 10px;border-radius:8px;font-size:20px;line-height:1;color:var(--ink)}
+.cartbtn:hover{background:var(--teal-soft)}
 .cartbadge{position:absolute;top:-4px;right:-4px;background:var(--mango);color:#fff;font-size:11px;font-weight:700;border-radius:99px;padding:1px 6px}
 
 main{max-width:1100px;margin:0 auto;padding:24px 20px 40px}
@@ -142,7 +143,15 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top}
 .paste-zone.ok{border-color:var(--teal);background:var(--teal-soft)}
 .copy-mini{background:var(--teal-soft);border:none;border-radius:7px;padding:4px 9px;cursor:pointer;font-size:13px;color:var(--teal-dark);font-weight:700}
 .draw-spin{font-family:'Sora',sans-serif;font-weight:800;font-size:26px;letter-spacing:.04em;margin:6px 0}
-@media(max-width:640px){.hwrap{padding:10px 14px}main{padding:16px 14px 70px}.grid-3{grid-template-columns:1fr 1fr}}
+@media(max-width:640px){
+  .hwrap{padding:10px 14px 8px;flex-wrap:wrap;gap:6px 10px}
+  .brand{order:1;font-size:20px}
+  .cartbtn{order:2;margin-left:auto;font-size:22px}
+  nav{order:3;width:100%;margin-left:0;gap:6px;overflow-x:auto;scrollbar-width:none}
+  nav::-webkit-scrollbar{display:none}
+  nav a{flex:1 0 auto;text-align:center;padding:8px 10px;font-size:13.5px;background:var(--bg)}
+  nav a.active{background:var(--teal-soft)}
+  main{padding:16px 14px 70px}.grid-3{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -155,8 +164,8 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top}
       <a href="#/track" data-r="track">Track</a>
       <a href="#/biz" data-r="biz">For businesses</a>
       <a href="#/admin" data-r="admin" id="adminLink" class="hidden">Admin</a>
-      <a href="#" id="cartLink" class="cartbtn">🛒<span class="cartbadge hidden" id="cartCount">0</span></a>
     </nav>
+    <a href="#" id="cartLink" class="cartbtn" aria-label="Cart">🛒<span class="cartbadge hidden" id="cartCount">0</span></a>
   </div>
 </header>
 <main id="app"></main>
